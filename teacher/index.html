@@ -28,6 +28,18 @@
   .help { display: none; max-width: 340px; line-height: 1.7; }
   .help a, .help button { display: inline-block; margin-top: 10px; background: #14283A; color: #fff; border: 0; border-radius: 12px; padding: 10px 18px; font: inherit; font-weight: 700; text-decoration: none; }
   .splash.slow .help { display: block; }
+  /* زر/بطاقة التثبيت */
+  .inst { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 5; background: #fff; color: #1f3a52; border-radius: 18px; box-shadow: 0 10px 40px rgba(10,30,50,.35); padding: 14px 16px; display: none; gap: 12px; align-items: center; font-size: 15px; line-height: 1.6; max-width: 520px; margin: 0 auto; animation: up .35s ease-out; }
+  .inst.on { display: flex; }
+  .inst img { width: 52px; height: 52px; border-radius: 13px; flex: none; }
+  .inst .t { flex: 1; min-width: 0; }
+  .inst b { display: block; font-size: 16px; }
+  .inst .go { background: #14283A; color: #fff; border: 0; border-radius: 12px; padding: 10px 16px; font: inherit; font-weight: 700; white-space: nowrap; cursor: pointer; }
+  .inst .x { position: absolute; top: 6px; left: 8px; border: 0; background: none; font-size: 22px; color: #8a99a6; cursor: pointer; padding: 4px 8px; }
+  .inst .sh { display: inline-flex; vertical-align: -5px; width: 22px; height: 22px; color: #1677d2; }
+  .inst .arrow { position: absolute; bottom: -34px; left: 50%; transform: translateX(-50%); font-size: 28px; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.5); animation: bob 1s ease-in-out infinite; }
+  @keyframes up { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes bob { 50% { transform: translate(-50%, 6px); } }
 </style>
 </head>
 <body>
@@ -42,8 +54,31 @@
     <a id="open" target="_blank" rel="noopener">افتح في المتصفح</a>
   </div>
 </div>
+<div class="inst" id="inst" role="dialog" aria-label="تثبيت التطبيق">
+  <button type="button" class="x" id="instX" aria-label="ليس الآن">×</button>
+  <img src="../icons/teacher-192.png" alt="">
+  <div class="t" id="instT"></div>
+  <button type="button" class="go" id="instGo" hidden>📲 ثبّت</button>
+  <span class="arrow" id="instArrow" hidden>⬇</span>
+</div>
 <script src="../config.js"></script>
 <script>
+
+/* ذاكرة التطبيق الدائمة: تحفظ بيانات الدخول للمنصّة (التي تعمل داخل إطار قد تُمسح ذاكرته)، وتعيدها عند كل فتح */
+(function () {
+  var KEY = 'pm_teacher';
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+  window.addEventListener('message', function (e) {
+    if (!/^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/i.test(e.origin)) return;
+    var m = e.data; if (!m || !m.pm || m.kind !== 'teacher') return;
+    var cur = {}; try { cur = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (x) {}
+    if (m.pm === 'get') { try { e.source.postMessage({ pm: 'data', data: cur }, e.origin); } catch (x) {} }
+    else if (m.pm === 'save' && m.data && typeof m.data === 'object') {
+      Object.keys(m.data).forEach(function (k) { if (/^mt_[a-z]+$/.test(k)) cur[k] = String(m.data[k] == null ? '' : m.data[k]).slice(0, 500); });
+      try { localStorage.setItem(KEY, JSON.stringify(cur)); } catch (x) {}
+    }
+  });
+})();
 (function () {
   var splash = document.getElementById('splash'), msg = document.getElementById('msg');
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(function () {});
@@ -63,6 +98,40 @@
   f.onload = function () { clearTimeout(slow); splash.classList.add('gone'); };
   document.body.appendChild(f);
   document.getElementById('retry').onclick = function () { location.reload(); };
+})();
+
+/* ---------- التثبيت بأسهل طريقة ---------- */
+(function () {
+  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if (standalone) return;
+  var later = 0; try { later = +localStorage.getItem('pm_inst_later') || 0; } catch (e) {}
+  if (Date.now() - later < 3 * 24 * 3600 * 1000) return;
+  var box = document.getElementById('inst'), t = document.getElementById('instT'), go = document.getElementById('instGo');
+  var ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var deferred = null;
+  document.getElementById('instX').onclick = function () { box.classList.remove('on'); try { localStorage.setItem('pm_inst_later', Date.now()); } catch (e) {} };
+  // Android / Chrome: زر تثبيت مباشر
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault(); deferred = e;
+    t.innerHTML = '<b>ثبّت Pi Math معلم على هاتفك</b>ضغطة واحدة، ويظهر بأيقونته على الشاشة';
+    go.hidden = false; box.classList.add('on');
+  });
+  go.onclick = function () {
+    if (!deferred) return;
+    deferred.prompt();
+    deferred.userChoice.then(function (r) { if (r.outcome === 'accepted') box.classList.remove('on'); deferred = null; });
+  };
+  window.addEventListener('appinstalled', function () { box.classList.remove('on'); });
+  // iPhone / iPad: لا يوجد زر تثبيت، فنشرح الخطوتين
+  if (ios) {
+    var safari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+    var share = '<svg class="sh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-8"/></svg>';
+    t.innerHTML = '<b>ثبّت Pi Math معلم على هاتفك</b>'
+      + (safari ? 'اضغط ' + share + ' في أسفل الشاشة، ثم <b style="display:inline">«إضافة إلى الشاشة الرئيسية»</b>'
+                : 'اضغط ' + share + ' (مشاركة)، ثم <b style="display:inline">«إضافة إلى الشاشة الرئيسية»</b>');
+    if (safari && !/iPad/.test(ua)) document.getElementById('instArrow').hidden = false;
+    setTimeout(function () { box.classList.add('on'); }, 2500);
+  }
 })();
 </script>
 </body>
