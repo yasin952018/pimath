@@ -7,6 +7,9 @@
 <meta name="description" content="مهامك ودروسك وتسليم وظائفك">
 <meta name="theme-color" content="#1A7FB8">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
+<link rel="dns-prefetch" href="https://n-script.googleusercontent.com">
 <link rel="icon" type="image/png" sizes="32x32" href="../icons/student-32.png">
 <link rel="apple-touch-icon" href="../icons/student-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -95,7 +98,12 @@
   f.allow = 'clipboard-write; fullscreen; camera';
   f.src = url;
   var slow = setTimeout(function () { splash.classList.add('slow'); }, 15000);
-  f.onload = function () { clearTimeout(slow); splash.classList.add('gone'); };
+  var hide = function () { clearTimeout(slow); splash.classList.add('gone'); };
+  // نبقي شاشة π حتى تخبرنا المنصّة أنها جاهزة (بدل شاشة بيضاء)، وإن لم تخبرنا نخفيها بعد 4 ثوانٍ
+  window.addEventListener('message', function (e) {
+    if (/^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/i.test(e.origin) && e.data && e.data.pm === 'ready') hide();
+  });
+  f.onload = function () { msg.textContent = 'تقريبًا جاهز…'; setTimeout(hide, 4000); };
   document.body.appendChild(f);
   document.getElementById('retry').onclick = function () { location.reload(); };
 })();
