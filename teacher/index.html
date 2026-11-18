@@ -98,20 +98,20 @@
   }
   var url = APP_URL.replace(/\?.*$/, '') + '?page=teacher';
   document.getElementById('open').href = url;
-  var f = null, tries = 0, readyGot = false, fb = null;
-  var slow = setTimeout(function () { splash.classList.add('slow'); }, 15000);
+  var f = null, tries = 0, readyGot = false, fb = null, loaded = false;
+  var slow = setTimeout(function () { splash.classList.add('slow'); }, 25000);
   var hide = function () { clearTimeout(slow); splash.classList.add('gone'); };
-  // نُنشئ الإطار فورًا؛ وإن لم تصل إشارة «جاهز» خلال 8 ثوانٍ نعيد تحميله مرة واحدة تلقائيًا (التعليق العابر غالبًا ينجح في المحاولة الثانية)
+  // نُنشئ الإطار فورًا؛ وإن لم ينتهِ تحميله إطلاقًا خلال 15 ثانية نعيده مرة واحدة تلقائيًا (لا نقطع تحميلًا بطيئًا يعمل)
   var load = function () {
     if (f) f.remove();
     f = document.createElement('iframe');
     f.title = document.title;
     f.allow = 'clipboard-write; fullscreen; camera';
     f.src = url;
-    f.onload = function () { msg.textContent = 'تقريبًا جاهز…'; clearTimeout(fb); fb = setTimeout(hide, 9000); };
+    f.onload = function () { loaded = true; msg.textContent = 'تقريبًا جاهز…'; clearTimeout(fb); fb = setTimeout(hide, 3000); };
     document.body.appendChild(f);
     tries++;
-    if (tries === 1) setTimeout(function () { if (!readyGot) { msg.textContent = 'إعادة المحاولة…'; load(); } }, 8000);
+    if (tries === 1) setTimeout(function () { if (!loaded && !readyGot) { msg.textContent = 'إعادة المحاولة…'; load(); } }, 15000);
   };
   window.addEventListener('message', function (e) {
     if (/^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/i.test(e.origin) && e.data && e.data.pm === 'ready') { readyGot = true; clearTimeout(fb); hide(); }
