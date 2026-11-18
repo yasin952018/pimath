@@ -98,6 +98,9 @@
   }
   var url = APP_URL.replace(/\?.*$/, '') + '?page=teacher';
   document.getElementById('open').href = url;
+  // تجربة: داخل التطبيق المثبّت نفتح الموقع مباشرة بدل الإطار (أسرع). للرجوع إلى الإطار أضف ?frame=1 إلى رابط التطبيق.
+  var standalone0 = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  if (standalone0 && !/[?&]frame=1/.test(location.search)) { msg.textContent = 'لحظة…'; location.replace(url); return; }
   var f = null, tries = 0, readyGot = false, fb = null, loaded = false;
   var slow = setTimeout(function () { splash.classList.add('slow'); }, 25000);
   var hide = function () { clearTimeout(slow); splash.classList.add('gone'); };
