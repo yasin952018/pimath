@@ -75,7 +75,12 @@
     if (!/^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/i.test(e.origin)) return;
     var m = e.data; if (!m || !m.pm || m.kind !== 'teacher') return;
     var cur = {}; try { cur = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (x) {}
-    if (m.pm === 'get') { try { e.source.postMessage({ pm: 'data', data: cur }, e.origin); } catch (x) {} }
+    var CK = 'pm_cache_' + KEY;
+    if (m.pm === 'get') { var cache = null; try { cache = JSON.parse(localStorage.getItem(CK) || 'null'); } catch (x) {} try { e.source.postMessage({ pm: 'data', data: cur, cache: cache }, e.origin); } catch (x) {} }
+    else if (m.pm === 'save' && m.cache !== undefined) {
+      try { if (m.cache === null) localStorage.removeItem(CK); else if (typeof m.cache === 'object') { var sz = JSON.stringify(m.cache); if (sz.length < 2500000) localStorage.setItem(CK, sz); } } catch (x) {}
+      if (m.data && typeof m.data === 'object') { Object.keys(m.data).forEach(function (k) { if (/^mt_[a-z]+$/.test(k)) cur[k] = String(m.data[k] == null ? '' : m.data[k]).slice(0, 500); }); try { localStorage.setItem(KEY, JSON.stringify(cur)); } catch (x) {} }
+    }
     else if (m.pm === 'save' && m.data && typeof m.data === 'object') {
       Object.keys(m.data).forEach(function (k) { if (/^mt_[a-z]+$/.test(k)) cur[k] = String(m.data[k] == null ? '' : m.data[k]).slice(0, 500); });
       try { localStorage.setItem(KEY, JSON.stringify(cur)); } catch (x) {}
@@ -93,18 +98,25 @@
   }
   var url = APP_URL.replace(/\?.*$/, '') + '?page=teacher';
   document.getElementById('open').href = url;
-  var f = document.createElement('iframe');
-  f.title = 'Pi Math معلم';
-  f.allow = 'clipboard-write; fullscreen; camera';
-  f.src = url;
+  var f = null, tries = 0, readyGot = false, fb = null;
   var slow = setTimeout(function () { splash.classList.add('slow'); }, 15000);
   var hide = function () { clearTimeout(slow); splash.classList.add('gone'); };
-  // نبقي شاشة π حتى تخبرنا المنصّة أنها جاهزة (بدل شاشة بيضاء)، وإن لم تخبرنا نخفيها بعد 4 ثوانٍ
+  // نُنشئ الإطار فورًا؛ وإن لم تصل إشارة «جاهز» خلال 8 ثوانٍ نعيد تحميله مرة واحدة تلقائيًا (التعليق العابر غالبًا ينجح في المحاولة الثانية)
+  var load = function () {
+    if (f) f.remove();
+    f = document.createElement('iframe');
+    f.title = document.title;
+    f.allow = 'clipboard-write; fullscreen; camera';
+    f.src = url;
+    f.onload = function () { msg.textContent = 'تقريبًا جاهز…'; clearTimeout(fb); fb = setTimeout(hide, 9000); };
+    document.body.appendChild(f);
+    tries++;
+    if (tries === 1) setTimeout(function () { if (!readyGot) { msg.textContent = 'إعادة المحاولة…'; load(); } }, 8000);
+  };
   window.addEventListener('message', function (e) {
-    if (/^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/i.test(e.origin) && e.data && e.data.pm === 'ready') hide();
+    if (/^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/i.test(e.origin) && e.data && e.data.pm === 'ready') { readyGot = true; clearTimeout(fb); hide(); }
   });
-  f.onload = function () { msg.textContent = 'تقريبًا جاهز…'; setTimeout(hide, 4000); };
-  document.body.appendChild(f);
+  load();
   document.getElementById('retry').onclick = function () { location.reload(); };
 })();
 
